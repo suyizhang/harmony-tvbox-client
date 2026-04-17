@@ -5,6 +5,7 @@ import { BackendApiService } from '../service/BackendApiService'
 import { MockBackendService } from '../service/MockBackendService'
 import { HistoryService, HistoryItem } from '../service/HistoryService'
 import { FavoriteService, FavoriteItem, FavoriteCategory } from '../service/FavoriteService'
+import { ThemeService, ThemeMode, ThemeConfig } from '../service/ThemeService'
 
 @Observed
 export class AppState {
@@ -20,6 +21,8 @@ export class AppState {
   playHistory: HistoryItem[] = []
   favorites: FavoriteItem[] = []
   favoriteStats: Record<string, number> = {}
+  themeMode: ThemeMode = ThemeMode.AUTO
+  themeConfig: ThemeConfig = ThemeService.getThemeConfig(ThemeMode.AUTO)
 
   saveSettings() {
     new SettingsService().save(this.settings)
@@ -146,6 +149,22 @@ export class AppState {
       timestamp: Date.now()
     }
     await HistoryService.addToHistory(historyItem)
+  }
+
+  // 主题相关方法
+  async loadTheme() {
+    this.themeMode = await ThemeService.getThemeMode()
+    this.themeConfig = ThemeService.getThemeConfig(this.themeMode)
+  }
+
+  async toggleTheme() {
+    const modes = [ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.AUTO]
+    const currentIndex = modes.indexOf(this.themeMode)
+    const nextIndex = (currentIndex + 1) % modes.length
+    this.themeMode = modes[nextIndex]
+    
+    await ThemeService.setThemeMode(this.themeMode)
+    this.themeConfig = ThemeService.getThemeConfig(this.themeMode)
   }
 
   openPlayer() {

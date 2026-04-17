@@ -1,7 +1,7 @@
 // 统一样式组件库
 export class AppStyles {
-  // 颜色定义
-  static readonly Colors = {
+  // 动态颜色 - 将根据主题更新
+  static Colors = {
     Primary: '#007AFF',
     Secondary: '#34C759',
     Orange: '#FF9500',
@@ -11,6 +11,14 @@ export class AppStyles {
     DarkGray: '#1C1C1E',
     Background: '#FFFFFF',
     CardBackground: '#FFFFFF'
+  }
+
+  // 更新主题颜色
+  static updateThemeColors(theme: any) {
+    this.Colors.Background = theme.backgroundColor
+    this.Colors.CardBackground = theme.surfaceColor
+    this.Colors.DarkGray = theme.textColor
+    this.Colors.Gray = theme.secondaryTextColor
   }
 
   // 字体大小

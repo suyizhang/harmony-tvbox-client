@@ -6,9 +6,15 @@ import { DetailPage } from './DetailPage'
 import { PlayerPage } from './PlayerPage'
 import { SettingsPage } from './SettingsPage'
 import { FavoritesPage } from './FavoritesPage'
+import { ThemeService, ThemeMode } from '../service/ThemeService'
 
 @Component
 export struct AppShell {
+  async aboutToAppear() {
+    await appState.loadTheme()
+    AppStyles.updateThemeColors(appState.themeConfig)
+  }
+
   build() {
     Column({ space: AppStyles.Spacing.M }) {
       // 头部
@@ -32,7 +38,7 @@ export struct AppShell {
     .padding(AppStyles.Spacing.M)
     .width('100%')
     .height('100%')
-    .backgroundColor(AppStyles.Colors.LightGray)
+    .backgroundColor(appState.themeConfig.backgroundColor)
   }
 
   @Builder buildHeader() {
@@ -43,6 +49,16 @@ export struct AppShell {
             .fontSize(AppStyles.FontSizes.Title1)
             .fontWeight(FontWeight.Bold)
             .layoutWeight(1)
+          
+          // 主题切换按钮
+          Button(ThemeService.getThemeIcon(appState.themeMode))
+            .width(40)
+            .height(40)
+            .backgroundColor('transparent')
+            .fontSize(20)
+            .onClick(async () => {
+              await appState.toggleTheme()
+            })
           
           if (appState.settings.useMockBackend) {
             StatusBadge({ text: '🎭 Mock', type: 'info' })
