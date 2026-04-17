@@ -2,6 +2,8 @@ import { appState } from '../common/AppState'
 import { BackendPlayResponse } from '../model/ApiModels'
 import { MockBackendService } from '../service/MockBackendService'
 import { BackendApiService } from '../service/BackendApiService'
+import { FavoriteService } from '../service/FavoriteService'
+import { AppStyles, PrimaryButton, StatusBadge } from '../components/Styles'
 
 @Component
 export struct PlayerPage {
@@ -114,44 +116,77 @@ export struct PlayerPage {
           }
 
           // 视频播放区域（模拟）
-          Column() {
-            if (appState.settings.useMockBackend) {
-              // Mock 播放器界面
-              Column() {
-                Text('🎬')
-                  .fontSize(48)
-                Text(appState.selectedSource?.title || 'Mock 视频')
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Medium)
-                Text('时长: 02:30:45')
-                  .fontSize(12)
-                  .fontColor(Color.Gray)
-                Text('分辨率: 1920x1080')
-                  .fontSize(12)
-                  .fontColor(Color.Gray)
-              }
-              .padding(32)
-              .backgroundColor('#000000')
-              .width('100%')
-              .height(240)
-              .justifyContent(FlexAlign.Center)
-              .alignItems(HorizontalAlign.Center)
-            } else {
-              // 真实播放器占位
-              Text('📺 视频播放器')
-                .fontSize(18)
-                .fontColor(Color.Gray)
+          Card() {
+            Stack() {
+              // 背景渐变
+              Column()
+                .width('100%')
+                .height('100%')
+                .linearGradient({
+                  angle: 135,
+                  colors: [['#1e3c72', 0.0], ['#2a5298', 1.0]]
+                })
+              
+              if (appState.settings.useMockBackend) {
+                // Mock 播放器界面
+                Column({ space: 12 }) {
+                  Text('🎬')
+                    .fontSize(64)
+                    .fontColor('#FFFFFF')
+                  Text(appState.selectedSource?.title || 'Mock 视频')
+                    .fontSize(20)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor('#FFFFFF')
+                  Row() {
+                    Text('⏱️ 02:30:45')
+                      .fontSize(14)
+                      .fontColor('#FFFFFF')
+                      .opacity(0.8)
+                    Text('📺 1920×1080')
+                      .fontSize(14)
+                      .fontColor('#FFFFFF')
+                      .opacity(0.8)
+                      .margin({ left: 16 })
+                  }
+                  Row() {
+                    Text('🔊 立体声')
+                      .fontSize(14)
+                      .fontColor('#FFFFFF')
+                      .opacity(0.8)
+                    Text('🎞️ MP4')
+                      .fontSize(14)
+                      .fontColor('#FFFFFF')
+                      .opacity(0.8)
+                      .margin({ left: 16 })
+                  }
+                }
+                .padding(32)
                 .width('100%')
                 .height(240)
-                .backgroundColor('#f0f0f0')
                 .justifyContent(FlexAlign.Center)
                 .alignItems(HorizontalAlign.Center)
+              } else {
+                // 真实播放器占位
+                Column() {
+                  Text('📺')
+                    .fontSize(48)
+                    .fontColor('#999999')
+                  Text('视频播放器')
+                    .fontSize(18)
+                    .fontColor('#666666')
+                }
+                .padding(32)
+                .width('100%')
+                .height(240)
+                .justifyContent(FlexAlign.Center)
+                .alignItems(HorizontalAlign.Center)
+                .backgroundColor('#f8f9fa')
+              }
             }
           }
           .width('100%')
           .height(240)
-          .backgroundColor('#000000')
-          .borderRadius(8)
+          .borderRadius(AppStyles.Radius.Large)
 
           // 播放URL信息
           if (appState.playUrl) {
@@ -172,29 +207,43 @@ export struct PlayerPage {
           }
 
           // 控制按钮
-          Row({ space: 12 }) {
-            Button(appState.settings.useMockBackend ? '🔄 换片' : '重新加载', { type: ButtonType.Normal })
-              .flexGrow(1)
-              .onClick(() => {
-                if (appState.settings.useMockBackend && appState.selectedSource) {
-                  const mockBackend = new MockBackendService()
-                  const ids = mockBackend.getAvailableIds()
-                  const randomId = ids[Math.floor(Math.random() * ids.length)]
-                  appState.selectedSource = { ...appState.selectedSource!, raw: { ...appState.selectedSource!.raw, key: randomId } }
-                  this.loadPlayUrl(randomId)
-                } else if (appState.selectedSource) {
-                  this.loadPlayUrl(appState.selectedSource.raw.key)
-                }
-              })
+          Column({ space: AppStyles.Spacing.S }) {
+            Row({ space: AppStyles.Spacing.S }) {
+              Button(appState.settings.useMockBackend ? '🔄 换片' : '重新加载', { type: ButtonType.Normal })
+                .flexGrow(1)
+                .onClick(() => {
+                  if (appState.settings.useMockBackend && appState.selectedSource) {
+                    const mockBackend = new MockBackendService()
+                    const ids = mockBackend.getAvailableIds()
+                    const randomId = ids[Math.floor(Math.random() * ids.length)]
+                    appState.selectedSource = { ...appState.selectedSource!, raw: { ...appState.selectedSource!.raw, key: randomId } }
+                    this.loadPlayUrl(randomId)
+                  } else if (appState.selectedSource) {
+                    this.loadPlayUrl(appState.selectedSource.raw.key)
+                  }
+                })
+              
+              Button('⏹ 停止', { type: ButtonType.Normal })
+                .flexGrow(1)
+                .onClick(() => {
+                  this.mockPlaying = false
+                  appState.playUrl = ''
+                })
+            }
             
-            Button('⏹ 停止', { type: ButtonType.Normal })
-              .flexGrow(1)
-              .onClick(() => {
-                this.mockPlaying = false
-                appState.playUrl = ''
-              })
+            // 收藏按钮
+            if (appState.selectedSource) {
+              Button(appState.favorites.some(f => f.id === appState.selectedSource?.id) ? '❤️ 已收藏' : '🤍 收藏', { type: ButtonType.Normal })
+                .width('100%')
+                .height(40)
+                .backgroundColor(appState.favorites.some(f => f.id === appState.selectedSource?.id) ? AppStyles.Colors.Red : AppStyles.Colors.Gray)
+                .onClick(async () => {
+                  if (appState.selectedSource) {
+                    await appState.toggleFavorite(appState.selectedSource)
+                  }
+                })
+            }
           }
-          .width('100%')
         }
       }
     }

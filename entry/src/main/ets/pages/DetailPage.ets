@@ -2,6 +2,8 @@ import { appState } from '../common/AppState'
 import { MockBackendService } from '../service/MockBackendService'
 import { BackendApiService } from '../service/BackendApiService'
 import { BackendDetail } from '../model/ApiModels'
+import { FavoriteService, FavoriteCategory } from '../service/FavoriteService'
+import { AppStyles, PrimaryButton, StatusBadge } from '../components/Styles'
 
 @Component
 export struct DetailPage {
@@ -80,16 +82,44 @@ export struct DetailPage {
         // 详情内容
         Column({ space: 16 }) {
           // 标题区域
-          Column() {
-            Text(this.detail.title)
-              .fontSize(24)
-              .fontWeight(FontWeight.Bold)
-            if (this.detail.description) {
-              Text(this.detail.description)
-                .fontSize(14)
-                .fontColor(Color.Gray)
-                .maxLines(3)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Card() {
+            Column({ space: 12 }) {
+              Row() {
+                Text(this.detail.title)
+                  .fontSize(AppStyles.FontSizes.Title2)
+                  .fontWeight(FontWeight.Bold)
+                  .layoutWeight(1)
+                if (appState.settings.useMockBackend) {
+                  StatusBadge({ text: '🎭 Mock', type: 'info' })
+                }
+              }
+              
+              if (this.detail.description) {
+                Text(this.detail.description)
+                  .fontSize(AppStyles.FontSizes.Body)
+                  .fontColor(AppStyles.Colors.Gray)
+                  .maxLines(3)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+              
+              // Mock 模式特殊信息
+              if (appState.settings.useMockBackend) {
+                Row() {
+                  Text('🎲 随机推荐')
+                    .fontSize(AppStyles.FontSizes.Caption1)
+                    .fontColor(AppStyles.Colors.Orange)
+                  Button('换一个', { type: ButtonType.Normal, stateEffect: true })
+                    .fontSize(10)
+                    .margin({ left: 8 })
+                    .onClick(() => {
+                      const mockBackend = new MockBackendService()
+                      const ids = mockBackend.getAvailableIds()
+                      const randomId = ids[Math.floor(Math.random() * ids.length)]
+                      appState.selectedSource = { ...appState.selectedSource!, raw: { ...appState.selectedSource!.raw, key: randomId } }
+                      this.loadDetail(randomId)
+                    })
+                }
+              }
             }
           }
 
@@ -112,20 +142,34 @@ export struct DetailPage {
             }
           }
 
-          // 播放按钮
-          Button('▶ 播放', { type: ButtonType.Normal, stateEffect: true })
-            .width('100%')
-            .height(48)
-            .backgroundColor('#007AFF')
-            .onClick(() => {
-              if (appState.settings.useMockBackend && this.detail) {
-                // Mock 模式下直接构造播放URL
-                appState.playUrl = this.detail.playUrl || 'https://mock-stream.example.com/default.mp4'
-                appState.openPlayer()
-              } else {
-                appState.openPlayer()
-              }
-            })
+          // 操作按钮区域
+          Row({ space: AppStyles.Spacing.S }) {
+            // 播放按钮
+            Button(appState.settings.useMockBackend ? '🎭 模拟播放' : '▶ 播放', { type: ButtonType.Normal, stateEffect: true })
+              .layoutWeight(2)
+              .height(48)
+              .backgroundColor('#007AFF')
+              .onClick(() => {
+                if (appState.settings.useMockBackend && this.detail) {
+                  appState.playUrl = this.detail.playUrl || 'https://mock-stream.example.com/default.mp4'
+                  appState.openPlayer()
+                } else {
+                  appState.openPlayer()
+                }
+              })
+            
+            // 收藏按钮
+            Button(appState.favorites.some(f => f.id === appState.selectedSource?.id) ? '❤️' : '🤍', { type: ButtonType.Normal, stateEffect: true })
+              .layoutWeight(1)
+              .height(48)
+              .backgroundColor(appState.favorites.some(f => f.id === appState.selectedSource?.id) ? '#FF3B30' : '#8E8E93')
+              .onClick(async () => {
+                if (appState.selectedSource) {
+                  await appState.toggleFavorite(appState.selectedSource)
+                }
+              })
+          }
+          .width('100%')
 
           // 源信息
           if (appState.selectedSource) {

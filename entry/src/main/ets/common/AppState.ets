@@ -3,6 +3,8 @@ import { ConfigService } from '../service/ConfigService'
 import { SettingsService } from '../service/SettingsService'
 import { BackendApiService } from '../service/BackendApiService'
 import { MockBackendService } from '../service/MockBackendService'
+import { HistoryService, HistoryItem } from '../service/HistoryService'
+import { FavoriteService, FavoriteItem, FavoriteCategory } from '../service/FavoriteService'
 
 @Observed
 export class AppState {
@@ -15,6 +17,9 @@ export class AppState {
   filteredSources: SourceUiModel[] = []
   selectedSource?: SourceUiModel = undefined
   playUrl: string = ''
+  playHistory: HistoryItem[] = []
+  favorites: FavoriteItem[] = []
+  favoriteStats: Record<string, number> = {}
 
   saveSettings() {
     new SettingsService().save(this.settings)
@@ -96,6 +101,53 @@ export class AppState {
     }
   }
 
+  // 收藏相关方法
+  async toggleFavorite(item?: SourceUiModel) {
+    if (!item) return
+    
+    const isFav = await FavoriteService.isFavorited(item.id)
+    if (isFav) {
+      await FavoriteService.removeFromFavorites(item.id)
+    } else {
+      const favoriteItem: Omit<FavoriteItem, 'createdAt' | 'updatedAt'> = {
+        id: item.id,
+        title: item.title,
+        subtitle: item.subtitle,
+        sourceId: item.id,
+        category: this.guessCategory(item.title)
+      }
+      await FavoriteService.addToFavorites(favoriteItem)
+    }
+    await this.loadFavorites()
+  }
+
+  async loadFavorites() {
+    this.favorites = await FavoriteService.getFavorites()
+    this.favoriteStats = await FavoriteService.getStatistics()
+  }
+
+  private guessCategory(title: string): FavoriteCategory {
+    const lower = title.toLowerCase()
+    if (lower.includes('动漫') || lower.includes('动画')) return FavoriteCategory.ANIME
+    if (lower.includes('综艺') || lower.includes('娱乐')) return FavoriteCategory.VARIETY
+    if (lower.includes('纪录')) return FavoriteCategory.DOCUMENTARY
+    if (lower.includes('第') && (lower.includes('季') || lower.includes('集'))) return FavoriteCategory.TV_SHOW
+    return FavoriteCategory.MOVIE
+  }
+
+  async addToHistory(detail: BackendDetail, playUrl: string) {
+    if (!this.selectedSource) return
+    
+    const historyItem: HistoryItem = {
+      id: detail.id,
+      title: detail.title,
+      subtitle: detail.description || this.selectedSource.subtitle,
+      playUrl: playUrl,
+      timestamp: Date.now()
+    }
+    await HistoryService.addToHistory(historyItem)
+  }
+
   openPlayer() {
     this.currentPage = 'player'
   }
@@ -106,6 +158,11 @@ export class AppState {
 
   openSettings() {
     this.currentPage = 'settings'
+  }
+
+  openFavorites() {
+    this.currentPage = 'favorites'
+    this.loadFavorites()
   }
 
   openHome() {
