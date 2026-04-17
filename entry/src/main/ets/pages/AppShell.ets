@@ -163,7 +163,9 @@ struct PlayerPanel {
       Text(`当前播放地址：${appState.playUrl || '未设置'}`)
         .fontSize(12)
 
-      Text('下一阶段接 HarmonyOS 播放组件；当前先完成页面串联。')
+      Text(appState.settings.useBackendAdapter
+        ? '当前为后端适配模式：后续由 /play 接口返回可播地址。'
+        : '当前为本地配置模式：后续支持直链或测试地址播放。')
         .fontSize(12)
 
       Button('返回详情')
