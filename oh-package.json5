@@ -1,0 +1,9 @@
+{
+  "name": "harmony-tvbox-client",
+  "version": "1.0.0",
+  "description": "HarmonyOS TVBox-like client prototype",
+  "main": "",
+  "author": "suyizhang",
+  "license": "MIT",
+  "dependencies": {}
+}

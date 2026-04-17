@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "Harmony TVBox Client"
+    },
+    {
+      "name": "module_desc",
+      "value": "HarmonyOS TVBox-like client prototype"
+    },
+    {
+      "name": "entryability_desc",
+      "value": "Entry ability"
+    }
+  ]
+}
