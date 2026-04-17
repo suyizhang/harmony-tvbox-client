@@ -1,14 +1,77 @@
 import { appState } from '../common/AppState'
-import { MockBackendService } from '../service/MockBackendService'
+import { SearchService, SearchFilter, SearchResult, SearchSuggestion } from '../service/SearchService'
 import { BackendApiService } from '../service/BackendApiService'
 import { UnifiedLoading, ErrorState, EmptyState } from '../components/LoadingStates'
+import { SearchFilterPanel } from '../components/SearchFilterPanel'
+import { ForEach, List, ListItem } from '@kit.ArkUI'
+import { ButtonType } from '@kit.ArkUI'
+import { Color } from '@kit.ArkUI'
+import { FontWeight } from '@kit.ArkUI'
+import { Slider } from '@kit.ArkUI'
+import { FlexAlign } from '@kit.ArkUI'
+import { router } from '@kit.ArkUI'
+import { preferences } from '@kit.ArkData'
+
+// 使用别名避免命名冲突
+import * as SearchComponents from './SearchPage'
+
+@Component
+struct SearchSuggestionItem {
+  private suggestion: SearchSuggestion
+  private onClick: () => void
+
+  build() {
+    Row() {
+      Text(this.suggestion.text)
+        .fontSize(14)
+        .layoutWeight(1)
+      Text(this.getSuggestionTypeText(this.suggestion.type))
+        .fontSize(10)
+        .fontColor('#999999')
+    }
+    .padding(8)
+    .width('100%')
+    .backgroundColor('#f5f5f5')
+    .borderRadius(4)
+    .onClick(() => this.onClick())
+  }
+
+  private getSuggestionTypeText(type: string): string {
+    switch (type) {
+      case 'autocomplete': return '自动补全'
+      case 'popular': return '热门搜索'
+      case 'history': return '搜索历史'
+      case 'keyword': return '关键词'
+      default: return ''
+    }
+  }
+
+  private getFilterDescription(): string {
+    const parts: string[] = []
+    if (this.searchFilter.type) {
+      parts.push(`类型: ${this.searchFilter.type.join(', ')}`)
+    }
+    if (this.searchFilter.category) {
+      parts.push(`分类: ${this.searchFilter.category.join(', ')}`)
+    }
+    if (this.searchFilter.year) {
+      parts.push(`年份: ${this.searchFilter.year.min || '不限'}-${this.searchFilter.year.max || '不限'}`)
+    }
+    return parts.join(' | ')
+  }
+}
 
 @Component
 export struct SearchPage {
   @State keyword: string = ''
-  @State searchResults: any[] = []
+  @State searchResults: SearchResult[] = []
+  @State searchSuggestions: SearchSuggestion[] = []
   @State searching: boolean = false
   @State error: string = ''
+  @State showSuggestions: boolean = false
+  @State searchFilter: SearchFilter = {}
+  @State hotKeywords: string[] = []
+  @State showFilterPanel: boolean = false
 
   build() {
     Column({ space: 12 }) {
@@ -21,17 +84,65 @@ export struct SearchPage {
         .fontSize(22)
         .fontWeight(FontWeight.Bold)
 
-      // 搜索框
-      Row({ space: 8 }) {
-        TextInput({ placeholder: '搜索影片、剧集', text: this.keyword })
-          .layoutWeight(1)
-          .onChange((value: string) => {
-            this.keyword = value
-          })
+      // 搜索框和过滤器
+      Column({ space: 8 }) {
+        Row({ space: 8 }) {
+          TextInput({ placeholder: '搜索影片、剧集', text: this.keyword })
+            .layoutWeight(1)
+            .onChange(async (value: string) => {
+              this.keyword = value
+              // 延迟加载建议
+              if (value.trim()) {
+                setTimeout(() => this.loadSuggestions(), 300)
+              } else {
+                this.showSuggestions = false
+              }
+            })
+          
+          Button(appState.settings.useMockBackend ? '🎭 搜索' : '搜索', { type: ButtonType.Normal })
+            .onClick(() => this.performSearch())
+            .disabled(this.searching)
+          
+          Button('🔍', { type: ButtonType.Normal })
+            .onClick(() => this.showFilterPanel = !this.showFilterPanel)
+        }
         
-        Button(appState.settings.useMockBackend ? '🎭 Mock搜索' : '搜索', { type: ButtonType.Normal })
-          .onClick(() => this.performSearch())
-          .disabled(this.searching)
+        // 搜索建议
+        if (this.showSuggestions && this.searchSuggestions.length > 0) {
+          Column({ space: 4 }) {
+            ForEach(this.searchSuggestions, (suggestion: SearchSuggestion) => {
+              Row() {
+                Text(suggestion.text)
+                  .fontSize(14)
+                  .layoutWeight(1)
+                Text(this.getSuggestionTypeText(suggestion.type))
+                  .fontSize(10)
+                  .fontColor('#999999')
+              }
+              .padding(8)
+              .width('100%')
+              .backgroundColor('#f5f5f5')
+              .borderRadius(4)
+              .onClick(async () => {
+                this.keyword = suggestion.text
+                this.showSuggestions = false
+                await this.performSearch()
+              })
+            })
+          }
+          .width('100%')
+        }
+        
+        // 过滤器面板
+        SearchFilterPanel({
+          filter: $searchFilter,
+          showPanel: $showFilterPanel,
+          onFilterChange: () => {
+            if (this.keyword.trim()) {
+              this.performSearch()
+            }
+          }
+        })
       }
 
       // 搜索结果
@@ -56,51 +167,100 @@ export struct SearchPage {
             .margin({ bottom: 8 })
           
           // 搜索结果列表
-          ForEach(this.searchResults, (item: any) => {
+          ForEach(this.searchResults, (item: SearchResult) => {
             Column() {
-              Text(item.title || item.name || '未知标题')
-                .fontSize(16)
-                .fontWeight(FontWeight.Medium)
+              Row() {
+                Text(item.title)
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Medium)
+                  .layoutWeight(1)
+                
+                // 评分徽章
+                if (item.rating) {
+                  Text(`${item.rating}分`)
+                    .fontSize(12)
+                    .fontColor('#FF6B35')
+                    .backgroundColor('#FFF2E8')
+                    .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+                    .borderRadius(4)
+                }
+              }
+              
+              if (item.subtitle) {
+                Text(item.subtitle)
+                  .fontSize(12)
+                  .fontColor(Color.Gray)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+              }
+              
               if (item.description) {
                 Text(item.description)
-                  .fontSize(12)
+                  .fontSize(11)
                   .fontColor(Color.Gray)
                   .maxLines(2)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .margin({ top: 2 })
               }
-              if (item.year || item.type) {
-                Row() {
-                  if (item.year) {
-                    Text(`📅 ${item.year}`)
-                      .fontSize(10)
-                      .fontColor(Color.Gray)
-                  }
-                  if (item.type) {
-                    Text(`🏷️ ${item.type}`)
-                      .fontSize(10)
-                      .fontColor(Color.Gray)
-                      .margin({ left: 8 })
-                  }
+              
+              // 元信息行
+              Row() {
+                if (item.year) {
+                  Text(`📅 ${item.year}`)
+                    .fontSize(10)
+                    .fontColor(Color.Gray)
                 }
+                if (item.type) {
+                  Text(`🏷️ ${item.type}`)
+                    .fontSize(10)
+                    .fontColor(Color.Gray)
+                    .margin({ left: 8 })
+                }
+                if (item.duration) {
+                  Text(`⏱️ ${Math.floor(item.duration/60)}分钟`)
+                    .fontSize(10)
+                    .fontColor(Color.Gray)
+                    .margin({ left: 8 })
+                }
+                if (item.category) {
+                  Text(`📂 ${item.category}`)
+                    .fontSize(10)
+                    .fontColor(Color.Gray)
+                    .margin({ left: 8 })
+                }
+              }
+              .margin({ top: 4 })
+              
+              // 标签
+              if (item.tags.length > 0) {
+                Row({ space: 4 }) {
+                  ForEach(item.tags.slice(0, 3), (tag: string) => {
+                    Text(`#${tag}`)
+                      .fontSize(9)
+                      .fontColor('#007AFF')
+                      .backgroundColor('#F0F8FF')
+                      .padding({ left: 4, right: 4, top: 1, bottom: 1 })
+                      .borderRadius(2)
+                  })
+                }
+                .margin({ top: 4 })
               }
             }
             .padding(12)
             .width('100%')
             .backgroundColor('#f9f9f9')
-            .borderRadius(6)
-            .margin({ bottom: 6 })
+            .borderRadius(8)
+            .margin({ bottom: 8 })
             .onClick(() => {
               // 点击搜索结果，打开详情页
-              if (item.id) {
-                appState.selectedSource = {
-                  id: item.id,
-                  title: item.title || item.name || '未知标题',
-                  subtitle: item.description || '',
-                  supportsSearch: true,
-                  raw: { key: item.id, name: item.title || item.name || 'unknown', ext: '' }
-                }
-                appState.openDetail(appState.selectedSource)
+              appState.selectedSource = {
+                id: item.id,
+                title: item.title,
+                subtitle: item.subtitle || '',
+                supportsSearch: true,
+                raw: { key: item.id, name: item.title, ext: '' }
               }
+              appState.openDetail(appState.selectedSource)
             })
           })
         }
@@ -115,36 +275,54 @@ export struct SearchPage {
           onAction: () => { this.keyword = '' }
         })
       } else {
-        // 默认提示
-        EmptyState({
-          icon: '🎭',
-          title: 'Mock 搜索模式',
-          description: '输入关键词搜索模拟数据',
-          showAction: false
-        })
-            
-            // Mock搜索建议
-            Column({ space: 4 }) {
-              Text('💡 试试搜索：').fontSize(12).fontColor(Color.Blue)
-              ForEach(['电影', '电视剧', '动漫', '综艺'], (keyword: string) => {
-                Button(keyword, { type: ButtonType.Normal, stateEffect: true })
-                  .fontSize(10)
-                  .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-                  .backgroundColor('#e3f2fd')
-                  .onClick(() => {
-                    this.keyword = keyword
-                    this.performSearch()
-                  })
-              })
+        // 默认页面 - 显示热门搜索和过滤器
+        Column({ space: 16 }) {
+          // 热门搜索
+          if (this.hotKeywords.length > 0) {
+            Column({ space: 8 }) {
+              Text('🔥 热门搜索')
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+              
+              Row({ space: 8 }) {
+                ForEach(this.hotKeywords.slice(0, 6), (keyword: string) => {
+                  Button(keyword, { type: ButtonType.Normal })
+                    .fontSize(12)
+                    .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                    .backgroundColor('#f0f0f0')
+                    .onClick(async () => {
+                      this.keyword = keyword
+                      await this.performSearch()
+                    })
+                })
+              }
             }
-            .margin({ top: 12 })
-          } else {
-            
           }
+          
+          // 当前过滤器显示
+          if (Object.keys(this.searchFilter).length > 0) {
+            Row() {
+              Text('当前过滤: ' + this.getFilterDescription())
+                .fontSize(12)
+                .fontColor(Color.Gray)
+              Button('清除', { type: ButtonType.Normal })
+                .fontSize(10)
+                .margin({ left: 8 })
+                .onClick(() => this.clearFilters())
+            }
+            .padding(8)
+            .backgroundColor('#f5f5f5')
+            .borderRadius(4)
+          }
+          
+          // 搜索提示
+          EmptyState({
+            icon: '💡',
+            title: '搜索提示',
+            description: '支持关键词搜索、类型过滤、时间筛选等高级功能',
+            showAction: false
+          })
         }
-        .alignItems(HorizontalAlign.Center)
-        .width('100%')
-        .margin({ top: 20 })
       }
     }
     .padding(16)
@@ -158,48 +336,60 @@ export struct SearchPage {
     
     this.searching = true
     this.error = ''
-    this.searchResults = []
+    this.showSuggestions = false
     
     try {
-      if (appState.settings.useMockBackend) {
-        // Mock 搜索
-        await new Promise(resolve => setTimeout(resolve, 800))
-        this.searchResults = this.generateMockSearchResults(this.keyword)
-      } else if (appState.settings.useBackendAdapter) {
-        // 真实后端搜索
-        const backend = new BackendApiService()
-        const response = await fetch(`${appState.settings.apiBaseUrl}/search?q=${encodeURIComponent(this.keyword)}`)
-        this.searchResults = await response.json()
-      } else {
-        // 本地模式，模拟搜索
-        await new Promise(resolve => setTimeout(resolve, 300))
-        this.searchResults = this.generateLocalSearchResults(this.keyword)
-      }
+      // 保存搜索历史
+      await SearchService.saveSearchHistory(this.keyword)
+      
+      // 使用新的搜索服务
+      const { results, suggestions } = await SearchService.smartSearch(
+        this.keyword,
+        this.searchFilter,
+        20
+      )
+      
+      this.searchResults = results
+      this.searchSuggestions = suggestions
+      
     } catch (err) {
       this.error = `搜索失败: ${err}`
       console.error('SearchPage performSearch error:', err)
+      this.searchResults = []
     } finally {
       this.searching = false
     }
   }
 
-  generateMockSearchResults(keyword: string): any[] {
-    const mockData = [
-      { id: 'movie_001', title: '流浪地球2', description: '太阳即将毁灭，人类建造推进器寻找新家园', year: '2023', type: '科幻' },
-      { id: 'movie_002', title: '满江红', description: '南宋绍兴年间，秦桧率兵与金国会谈的阴谋故事', year: '2023', type: '悬疑' },
-      { id: 'tv_001', title: '狂飙', description: '京海市一线刑警安欣与黑恶势力的斗争', year: '2023', type: '犯罪' },
-      { id: 'movie_003', title: '阿凡达：水之道', description: '杰克·萨利一家在潘多拉星球的冒险', year: '2022', type: '科幻' },
-      { id: 'tv_002', title: '三体', description: '地球文明与三体文明的宇宙史诗', year: '2023', type: '科幻' }
-    ]
+  async loadSuggestions() {
+    if (this.keyword.trim().length === 0) {
+      this.searchSuggestions = []
+      this.showSuggestions = false
+      return
+    }
     
-    return mockData.filter(item => 
-      item.title.toLowerCase().includes(keyword.toLowerCase()) ||
-      item.description.toLowerCase().includes(keyword.toLowerCase())
-    )
+    try {
+      const { suggestions } = await SearchService.smartSearch(this.keyword, {}, 5)
+      this.searchSuggestions = suggestions
+      this.showSuggestions = this.searchSuggestions.length > 0
+    } catch (error) {
+      console.error('Failed to load suggestions:', error)
+      this.searchSuggestions = []
+      this.showSuggestions = false
+    }
   }
 
-  generateLocalSearchResults(keyword: string): any[] {
-    // 简单的本地搜索模拟
-    return []
+  async applyFilter(filter: SearchFilter) {
+    this.searchFilter = { ...this.searchFilter, ...filter }
+    if (this.keyword.trim()) {
+      await this.performSearch()
+    }
+  }
+
+  clearFilters() {
+    this.searchFilter = {}
+    if (this.keyword.trim()) {
+      this.performSearch()
+    }
   }
 }

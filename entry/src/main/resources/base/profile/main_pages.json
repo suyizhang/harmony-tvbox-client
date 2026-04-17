@@ -4,6 +4,10 @@
     "pages/SearchPage",
     "pages/DetailPage",
     "pages/PlayerPage",
-    "pages/SettingsPage"
+    "pages/SettingsPage",
+    "pages/HistoryPage",
+    "pages/FavoritesPage",
+    "pages/AnalyticsPage",
+    "pages/LoginPage"
   ]
 }

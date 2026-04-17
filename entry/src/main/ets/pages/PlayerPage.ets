@@ -6,6 +6,11 @@ import { FavoriteService } from '../service/FavoriteService'
 import { VideoPlayerService } from '../service/VideoPlayerService'
 import { AppStyles, PrimaryButton, StatusBadge } from '../components/Styles'
 import { UnifiedLoading, ErrorState } from '../components/LoadingStates'
+import { Slider, SliderStyle } from '@kit.ArkUI'
+import { Picker } from '@kit.ArkUI'
+import { ButtonType } from '@kit.ArkUI'
+import { FlexAlign } from '@kit.ArkUI'
+import { Color } from '@kit.ArkUI'
 
 @Component
 export struct PlayerPage {
@@ -163,9 +168,127 @@ export struct PlayerPage {
             } else {
               // 真实视频播放区域
               Column() {
-                // 这里在实际项目中会嵌入真实的视频播放器组件
-                Column() {
-                  if (this.isRealPlaying) {
+                if (this.isRealPlaying) {
+                  // 真实播放器界面
+                  Stack() {
+                    // 视频播放区域
+                    Column()
+                      .width('100%')
+                      .height('100%')
+                      .backgroundColor('#000000')
+                      .onClick(() => {
+                        // 点击切换播放/暂停
+                        if (this.playerService.isPlaying()) {
+                          this.playerService.pause()
+                        } else {
+                          this.playerService.resume()
+                        }
+                      })
+                    
+                    // 播放状态叠加层
+                    if (!this.playerService.isPlaying() && !this.playerService.isPaused()) {
+                      Column() {
+                        Text('▶')
+                          .fontSize(64)
+                          .fontColor('#FFFFFF')
+                          .opacity(0.8)
+                      }
+                      .width('100%')
+                      .height('100%')
+                      .justifyContent(FlexAlign.Center)
+                      .alignItems(HorizontalAlign.Center)
+                    }
+                  }
+                  .width('100%')
+                  .height(240)
+                  
+                  // 播放控制栏
+                  Column({ space: 8 }) {
+                    // 进度条
+                    Slider({
+                      value: this.playerService.getProgress(),
+                      min: 0,
+                      max: 100,
+                      style: SliderStyle.OutSet
+                    })
+                    .width('100%')
+                    .onChange(async (value: number) => {
+                      const duration = this.playerService.getDuration()
+                      const seekTime = (value / 100) * duration
+                      await this.playerService.seekTo(seekTime)
+                    })
+                    
+                    // 时间和控制按钮
+                    Row({ space: 12 }) {
+                      Text(`${Math.floor(this.playerService.getCurrentTime())}s`)
+                        .fontSize(12)
+                        .fontColor('#666666')
+                      
+                      // 播放/暂停按钮
+                      Button(this.playerService.isPlaying() ? '⏸️' : '▶️', { type: ButtonType.Circle })
+                        .width(40)
+                        .height(40)
+                        .onClick(async () => {
+                          if (this.playerService.isPlaying()) {
+                            await this.playerService.pause()
+                          } else {
+                            await this.playerService.resume()
+                          }
+                        })
+                      
+                      // 停止按钮
+                      Button('⏹️', { type: ButtonType.Circle })
+                        .width(40)
+                        .height(40)
+                        .onClick(async () => {
+                          await this.playerService.stop()
+                          this.isRealPlaying = false
+                        })
+                      
+                      Text(`${Math.floor(this.playerService.getDuration())}s`)
+                        .fontSize(12)
+                        .fontColor('#666666')
+                    }
+                    .width('100%')
+                    .justifyContent(FlexAlign.SpaceBetween)
+                    
+                    // 音量和速度控制
+                    Row({ space: 12 }) {
+                      // 音量控制
+                      Row({ space: 4 }) {
+                        Text('🔊')
+                          .fontSize(14)
+                        Slider({
+                          value: 70, // 默认音量70%
+                          min: 0,
+                          max: 100
+                        })
+                        .width(80)
+                        .onChange(async (value: number) => {
+                          await this.playerService.setVolume(value / 100)
+                        })
+                      }
+                      
+                      // 播放速度
+                      Picker()
+                        .selected(2) // 默认1.0x
+                        .onChange((index: number) => {
+                          const speeds = this.playerService.getSupportedSpeeds()
+                          this.playerService.setPlaybackSpeed(speeds[index])
+                        })
+                        .child(
+                          Text(`${this.playerService.getSupportedSpeeds()[2]}x`)
+                            .fontSize(12)
+                        )
+                    }
+                    .width('100%')
+                  }
+                  .padding(12)
+                  .backgroundColor('#f8f9fa')
+                  .borderRadius(8)
+                } else {
+                  // 播放前界面
+                  Column() {
                     Text('🎥')
                       .fontSize(48)
                       .fontColor('#007AFF')
@@ -176,27 +299,24 @@ export struct PlayerPage {
                       .fontSize(10)
                       .fontColor('#666666')
                       .maxLines(1)
-                  } else {
-                    Text('▶')
-                      .fontSize(48)
-                      .fontColor('#007AFF')
-                    Text('点击播放')
-                      .fontSize(16)
-                      .fontColor('#333333')
                   }
+                  .padding(32)
+                  .width('100%')
+                  .height(240)
+                  .justifyContent(FlexAlign.Center)
+                  .alignItems(HorizontalAlign.Center)
+                  .backgroundColor('#f8f9fa')
+                  .onClick(async () => {
+                    if (appState.playUrl && !this.isRealPlaying) {
+                      this.isRealPlaying = true
+                      const success = await this.playerService.play(appState.playUrl)
+                      if (!success) {
+                        this.error = '播放失败，请检查网络连接'
+                        this.loading = false
+                      }
+                    }
+                  })
                 }
-                .padding(32)
-                .width('100%')
-                .height(240)
-                .justifyContent(FlexAlign.Center)
-                .alignItems(HorizontalAlign.Center)
-                .backgroundColor('#f8f9fa')
-                .onClick(async () => {
-                  if (appState.playUrl && !this.isRealPlaying) {
-                    this.isRealPlaying = true
-                    await this.playerService.play(appState.playUrl)
-                  }
-                })
               }
             }
           }
