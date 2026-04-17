@@ -1,10 +1,11 @@
 import { AppSettings, SourceUiModel } from '../model/Models'
 import { ConfigService } from '../service/ConfigService'
+import { SettingsService } from '../service/SettingsService'
 
 @Observed
 export class AppState {
   currentPage: string = 'home'
-  settings: AppSettings = new ConfigService().createDefaultSettings()
+  settings: AppSettings = new SettingsService().load()
   status: string = '准备就绪'
   overview: string = ''
   searchKeyword: string = ''
@@ -12,6 +13,10 @@ export class AppState {
   filteredSources: SourceUiModel[] = []
   selectedSource?: SourceUiModel = undefined
   playUrl: string = ''
+
+  saveSettings() {
+    new SettingsService().save(this.settings)
+  }
 
   async loadConfig() {
     this.status = '正在加载 TVBox 配置...'
