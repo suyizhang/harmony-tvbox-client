@@ -162,6 +162,129 @@ export class FavoriteService {
   }
 
   /**
+   * 批量删除收藏
+   */
+  static async batchDeleteFavorites(ids: string[]): Promise<{ success: number; failed: number }> {
+    try {
+      const favorites = await this.getFavorites();
+      let success = 0;
+      let failed = 0;
+      
+      const filteredFavorites = favorites.filter(fav => {
+        if (ids.includes(fav.id)) {
+          success++;
+          return false;
+        } else {
+          return true;
+        }
+      });
+      
+      await preferences.setPreferencesValue(
+        'com.suyizhang.tvbox',
+        this.FAVORITES_KEY,
+        JSON.stringify(filteredFavorites)
+      );
+      
+      return { success, failed };
+    } catch (error) {
+      console.error('Batch delete favorites failed:', error);
+      return { success: 0, failed: ids.length };
+    }
+  }
+
+  /**
+   * 批量更新收藏分类
+   */
+  static async batchUpdateCategory(ids: string[], category: FavoriteCategory): Promise<{ success: number; failed: number }> {
+    try {
+      const favorites = await this.getFavorites();
+      let success = 0;
+      let failed = 0;
+      
+      const updatedFavorites = favorites.map(fav => {
+        if (ids.includes(fav.id)) {
+          success++;
+          return { ...fav, category, updatedAt: Date.now() };
+        }
+        return fav;
+      });
+      
+      await preferences.setPreferencesValue(
+        'com.suyizhang.tvbox',
+        this.FAVORITES_KEY,
+        JSON.stringify(updatedFavorites)
+      );
+      
+      return { success, failed };
+    } catch (error) {
+      console.error('Batch update category failed:', error);
+      return { success: 0, failed: ids.length };
+    }
+  }
+
+  /**
+   * 批量添加标签
+   */
+  static async batchAddTags(ids: string[], tags: string[]): Promise<{ success: number; failed: number }> {
+    try {
+      const favorites = await this.getFavorites();
+      let success = 0;
+      let failed = 0;
+      
+      const updatedFavorites = favorites.map(fav => {
+        if (ids.includes(fav.id)) {
+          success++;
+          const existingTags = fav.tags || [];
+          const newTags = [...new Set([...existingTags, ...tags])]; // 去重合并
+          return { ...fav, tags: newTags, updatedAt: Date.now() };
+        }
+        return fav;
+      });
+      
+      await preferences.setPreferencesValue(
+        'com.suyizhang.tvbox',
+        this.FAVORITES_KEY,
+        JSON.stringify(updatedFavorites)
+      );
+      
+      return { success, failed };
+    } catch (error) {
+      console.error('Batch add tags failed:', error);
+      return { success: 0, failed: ids.length };
+    }
+  }
+
+  /**
+   * 获取收藏统计信息
+   */
+  static async getFavoriteStats(): Promise<{ 
+    total: number; 
+    byCategory: Record<string, number>; 
+    recentlyAdded: number 
+  }> {
+    try {
+      const favorites = await this.getFavorites();
+      const total = favorites.length;
+      const byCategory: Record<string, number> = {};
+      const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+      let recentlyAdded = 0;
+      
+      favorites.forEach(fav => {
+        const cat = fav.category || FavoriteCategory.OTHER;
+        byCategory[cat] = (byCategory[cat] || 0) + 1;
+        if (fav.createdAt > oneWeekAgo) {
+          recentlyAdded++;
+        }
+      });
+      
+      return { total, byCategory, recentlyAdded };
+    } catch (error) {
+      console.error('Get favorite stats failed:', error);
+      return { total: 0, byCategory: {}, recentlyAdded: 0 };
+    }
+  }
+
+  /**
    * 按分类获取收藏
    */
   static async getFavoritesByCategory(category: FavoriteCategory): Promise<FavoriteItem[]> {

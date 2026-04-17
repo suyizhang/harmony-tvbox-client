@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+.npm
+.hvigor
+
+# Build outputs
+entry/build/
+entry/outputs/
+*.hap
+*.app
+*.pack
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Cache files
+.cache/
+.temp/
+*.tmp
+
+# Test files
+test-results/
+coverage/
+
+# HarmonyOS specific
+oh_modules/
+.dependency.lock.json
+hvigor_config.json
+
+# Debug files
+debug/
+*.dbg
+
+# Sensitive data
+config/secrets.json
+*.keystore
+*.p12

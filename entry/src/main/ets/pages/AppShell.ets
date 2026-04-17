@@ -6,13 +6,35 @@ import { DetailPage } from './DetailPage'
 import { PlayerPage } from './PlayerPage'
 import { SettingsPage } from './SettingsPage'
 import { FavoritesPage } from './FavoritesPage'
+import { HistoryPage } from './HistoryPage'
+import { LoginPage } from './LoginPage'
+import { AnalyticsPage } from './AnalyticsPage'
 import { ThemeService, ThemeMode } from '../service/ThemeService'
+import { AnimationUtils } from '../components/Animations'
+import { Column, Row, Text, Button } from '@ohos.arkui.ArkUI'
 
 @Component
 export struct AppShell {
+  @State private currentAnimation: string = ''
+  
   async aboutToAppear() {
     await appState.loadTheme()
     AppStyles.updateThemeColors(appState.themeConfig)
+  }
+
+  @Builder
+  buildPage(pageName: string, pageComponent: any) {
+    Column() {
+      pageComponent()
+    }
+    .opacity(0)
+    .onAppear(() => {
+      // 页面出现动画
+      AnimationUtils.slideIn(this.pageRef, 'left', 300)
+        .then(() => {
+          this.pageRef.opacity(1)
+        })
+    })
   }
 
   build() {
@@ -20,25 +42,75 @@ export struct AppShell {
       // 头部
       this.buildHeader()
       
-      // 主要内容区域
-      if (appState.currentPage === 'home') {
-        this.buildHomePage()
+      // 主要内容区域（带动画）
+      if (appState.currentPage === 'login') {
+        LoginPage()
+      } else if (appState.currentPage === 'home') {
+        Column() {
+          this.buildSortControls()
+          this.buildHomePage()
+        }
       } else if (appState.currentPage === 'search') {
-        SearchPage()
+        this.buildPage('search', SearchPage)
       } else if (appState.currentPage === 'detail') {
-        DetailPage()
+        this.buildPage('detail', DetailPage)
       } else if (appState.currentPage === 'player') {
-        PlayerPage()
+        this.buildPage('player', PlayerPage)
       } else if (appState.currentPage === 'settings') {
-        SettingsPage({ settings: appState.settings })
+        this.buildPage('settings', () => SettingsPage({ settings: appState.settings }))
       } else if (appState.currentPage === 'favorites') {
-        FavoritesPage()
+        this.buildPage('favorites', FavoritesPage)
+      } else if (appState.currentPage === 'history') {
+        this.buildPage('history', HistoryPage)
+      } else if (appState.currentPage === 'analytics') {
+        AnalyticsPage()
       }
     }
     .padding(AppStyles.Spacing.M)
     .width('100%')
     .height('100%')
     .backgroundColor(appState.themeConfig.backgroundColor)
+  }
+
+  // 构建排序控制栏
+  @Builder
+  buildSortControls() {
+    Row({ space: AppStyles.Spacing.S }) {
+      Text('排序:')
+        .fontSize(AppStyles.FontSizes.Caption1)
+        .fontColor(appState.themeConfig.textColor)
+      
+      Button(`名称 ${appState.getSortIcon('name')}`)
+        .fontSize(12)
+        .height(32)
+        .onClick(() => appState.toggleSort('name'))
+      
+      Button(`类型 ${appState.getSortIcon('type')}`)
+        .fontSize(12)
+        .height(32)
+        .onClick(() => appState.toggleSort('type'))
+      
+      Button(`状态 ${appState.getSortIcon('status')}`)
+        .fontSize(12)
+        .height(32)
+        .onClick(() => appState.toggleSort('status'))
+      
+      Button(`使用 ${appState.getSortIcon('lastUsed')}`)
+        .fontSize(12)
+        .height(32)
+        .onClick(() => appState.toggleSort('lastUsed'))
+      
+      Button(appState.sortAscending ? '↑ 升序' : '↓ 降序')
+        .fontSize(12)
+        .height(32)
+        .onClick(() => {
+          appState.sortAscending = !appState.sortAscending
+          appState.sortSources()
+        })
+    }
+    .padding(AppStyles.Spacing.S)
+    .backgroundColor(appState.themeConfig.cardBackgroundColor)
+    .borderRadius(AppStyles.Radius.Medium)
   }
 
   @Builder buildHeader() {
@@ -103,6 +175,12 @@ export struct AppShell {
         PrimaryButton({
           text: '⭐ 收藏',
           onClick: () => appState.openFavorites()
+        })
+        .layoutWeight(1)
+        
+        PrimaryButton({
+          text: '📺 历史',
+          onClick: () => appState.openHistory()
         })
         .layoutWeight(1)
         

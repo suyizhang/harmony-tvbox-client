@@ -3,7 +3,9 @@ import { BackendPlayResponse } from '../model/ApiModels'
 import { MockBackendService } from '../service/MockBackendService'
 import { BackendApiService } from '../service/BackendApiService'
 import { FavoriteService } from '../service/FavoriteService'
+import { VideoPlayerService } from '../service/VideoPlayerService'
 import { AppStyles, PrimaryButton, StatusBadge } from '../components/Styles'
+import { UnifiedLoading, ErrorState } from '../components/LoadingStates'
 
 @Component
 export struct PlayerPage {
@@ -11,6 +13,8 @@ export struct PlayerPage {
   @State loading: boolean = true
   @State error: string = ''
   @State mockPlaying: boolean = false
+  @State isRealPlaying: boolean = false
+  private playerService: VideoPlayerService = new VideoPlayerService()
 
   async aboutToAppear() {
     if (appState.selectedSource && appState.selectedSource.raw.key) {
@@ -70,32 +74,22 @@ export struct PlayerPage {
         .margin({ bottom: 16 })
 
       if (this.loading) {
-        Column() {
-          LoadingProgress.create()
-            .width(50)
-            .height(50)
-          Text('正在准备播放...')
-            .fontSize(14)
-            .fontColor(Color.Gray)
-        }
-        .alignItems(HorizontalAlign.Center)
-        .width('100%')
+        UnifiedLoading({
+          message: '正在准备播放...',
+          showProgress: true,
+          size: 'medium'
+        })
       } else if (this.error) {
-        Column() {
-          Text('播放出错')
-            .fontSize(18)
-            .fontColor(Color.Red)
-          Text(this.error)
-            .fontSize(12)
-            .fontColor(Color.Gray)
-          Button('重试', { type: ButtonType.Normal })
-            .onClick(() => {
-              if (appState.selectedSource) {
-                this.loadPlayUrl(appState.selectedSource.raw.key)
-              }
-            })
-        }
-        .alignItems(HorizontalAlign.Center)
+        ErrorState({
+          title: '播放出错',
+          message: this.error,
+          showRetry: true,
+          onRetry: () => {
+            if (appState.selectedSource) {
+              this.loadPlayUrl(appState.selectedSource.raw.key)
+            }
+          }
+        })
       } else {
         // 播放器界面
         Column({ space: 12 }) {
@@ -115,20 +109,20 @@ export struct PlayerPage {
             .margin({ bottom: 8 })
           }
 
-          // 视频播放区域（模拟）
+          // 视频播放区域
           Card() {
-            Stack() {
-              // 背景渐变
-              Column()
-                .width('100%')
-                .height('100%')
-                .linearGradient({
-                  angle: 135,
-                  colors: [['#1e3c72', 0.0], ['#2a5298', 1.0]]
-                })
-              
-              if (appState.settings.useMockBackend) {
-                // Mock 播放器界面
+            if (appState.settings.useMockBackend && !this.isRealPlaying) {
+              // Mock 播放器界面
+              Stack() {
+                // 背景渐变
+                Column()
+                  .width('100%')
+                  .height('100%')
+                  .linearGradient({
+                    angle: 135,
+                    colors: [['#1e3c72', 0.0], ['#2a5298', 1.0]]
+                  })
+                
                 Column({ space: 12 }) {
                   Text('🎬')
                     .fontSize(64)
@@ -165,15 +159,31 @@ export struct PlayerPage {
                 .height(240)
                 .justifyContent(FlexAlign.Center)
                 .alignItems(HorizontalAlign.Center)
-              } else {
-                // 真实播放器占位
+              }
+            } else {
+              // 真实视频播放区域
+              Column() {
+                // 这里在实际项目中会嵌入真实的视频播放器组件
                 Column() {
-                  Text('📺')
-                    .fontSize(48)
-                    .fontColor('#999999')
-                  Text('视频播放器')
-                    .fontSize(18)
-                    .fontColor('#666666')
+                  if (this.isRealPlaying) {
+                    Text('🎥')
+                      .fontSize(48)
+                      .fontColor('#007AFF')
+                    Text('真实播放模式')
+                      .fontSize(16)
+                      .fontColor('#333333')
+                    Text(appState.playUrl || '播放地址')
+                      .fontSize(10)
+                      .fontColor('#666666')
+                      .maxLines(1)
+                  } else {
+                    Text('▶')
+                      .fontSize(48)
+                      .fontColor('#007AFF')
+                    Text('点击播放')
+                      .fontSize(16)
+                      .fontColor('#333333')
+                  }
                 }
                 .padding(32)
                 .width('100%')
@@ -181,6 +191,12 @@ export struct PlayerPage {
                 .justifyContent(FlexAlign.Center)
                 .alignItems(HorizontalAlign.Center)
                 .backgroundColor('#f8f9fa')
+                .onClick(async () => {
+                  if (appState.playUrl && !this.isRealPlaying) {
+                    this.isRealPlaying = true
+                    await this.playerService.play(appState.playUrl)
+                  }
+                })
               }
             }
           }
@@ -208,27 +224,48 @@ export struct PlayerPage {
 
           // 控制按钮
           Column({ space: AppStyles.Spacing.S }) {
-            Row({ space: AppStyles.Spacing.S }) {
-              Button(appState.settings.useMockBackend ? '🔄 换片' : '重新加载', { type: ButtonType.Normal })
-                .flexGrow(1)
-                .onClick(() => {
-                  if (appState.settings.useMockBackend && appState.selectedSource) {
-                    const mockBackend = new MockBackendService()
-                    const ids = mockBackend.getAvailableIds()
-                    const randomId = ids[Math.floor(Math.random() * ids.length)]
-                    appState.selectedSource = { ...appState.selectedSource!, raw: { ...appState.selectedSource!.raw, key: randomId } }
-                    this.loadPlayUrl(randomId)
-                  } else if (appState.selectedSource) {
-                    this.loadPlayUrl(appState.selectedSource.raw.key)
-                  }
-                })
-              
-              Button('⏹ 停止', { type: ButtonType.Normal })
-                .flexGrow(1)
-                .onClick(() => {
-                  this.mockPlaying = false
-                  appState.playUrl = ''
-                })
+            if (this.isRealPlaying) {
+              // 真实播放模式控制
+              Row({ space: AppStyles.Spacing.S }) {
+                Button('⏸️ 暂停', { type: ButtonType.Normal })
+                  .flexGrow(1)
+                  .onClick(async () => {
+                    await this.playerService.pause()
+                  })
+                
+                Button('⏹️ 停止', { type: ButtonType.Normal })
+                  .flexGrow(1)
+                  .onClick(async () => {
+                    await this.playerService.stop()
+                    this.isRealPlaying = false
+                  })
+              }
+            } else {
+              // Mock模式控制
+              Row({ space: AppStyles.Spacing.S }) {
+                Button(appState.settings.useMockBackend ? '🔄 换片' : '重新加载', { type: ButtonType.Normal })
+                  .flexGrow(1)
+                  .onClick(() => {
+                    if (appState.settings.useMockBackend && appState.selectedSource) {
+                      const mockBackend = new MockBackendService()
+                      const ids = mockBackend.getAvailableIds()
+                      const randomId = ids[Math.floor(Math.random() * ids.length)]
+                      appState.selectedSource = { ...appState.selectedSource!, raw: { ...appState.selectedSource!.raw, key: randomId } }
+                      this.loadPlayUrl(randomId)
+                    } else if (appState.selectedSource) {
+                      this.loadPlayUrl(appState.selectedSource.raw.key)
+                    }
+                  })
+                
+                Button('▶️ 播放', { type: ButtonType.Normal })
+                  .flexGrow(1)
+                  .onClick(async () => {
+                    if (appState.playUrl) {
+                      this.isRealPlaying = true
+                      await this.playerService.play(appState.playUrl)
+                    }
+                  })
+              }
             }
             
             // 收藏按钮

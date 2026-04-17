@@ -4,6 +4,7 @@ import { BackendApiService } from '../service/BackendApiService'
 import { BackendDetail } from '../model/ApiModels'
 import { FavoriteService, FavoriteCategory } from '../service/FavoriteService'
 import { AppStyles, PrimaryButton, StatusBadge } from '../components/Styles'
+import { UnifiedLoading, ErrorState } from '../components/LoadingStates'
 
 @Component
 export struct DetailPage {
@@ -54,30 +55,27 @@ export struct DetailPage {
         .margin({ bottom: 16 })
 
       if (!appState.selectedSource) {
-        Text('未选择源')
-          .fontSize(18)
-          .fontColor(Color.Red)
+        EmptyState({
+          icon: '⚠️',
+          title: '未选择源',
+          description: '请先选择一个数据源',
+          showAction: true,
+          actionText: '返回首页',
+          onAction: () => appState.openHome()
+        })
       } else if (this.loading) {
-        Column() {
-          LoadingProgress.create()
-            .width(50)
-            .height(50)
-          Text('正在加载详情...')
-            .fontSize(14)
-            .fontColor(Color.Gray)
-        }
-        .alignItems(HorizontalAlign.Center)
+        UnifiedLoading({
+          message: '正在加载详情...',
+          showProgress: true,
+          size: 'medium'
+        })
       } else if (this.error) {
-        Column() {
-          Text('加载出错')
-            .fontSize(18)
-            .fontColor(Color.Red)
-          Text(this.error)
-            .fontSize(12)
-            .fontColor(Color.Gray)
-          Button('重试', { type: ButtonType.Normal })
-            .onClick(() => this.loadDetail(appState.selectedSource!.raw.key))
-        }
+        ErrorState({
+          title: '加载出错',
+          message: this.error,
+          showRetry: true,
+          onRetry: () => this.loadDetail(appState.selectedSource!.raw.key)
+        })
       } else if (this.detail) {
         // 详情内容
         Column({ space: 16 }) {

@@ -23,6 +23,12 @@ export class AppState {
   favoriteStats: Record<string, number> = {}
   themeMode: ThemeMode = ThemeMode.AUTO
   themeConfig: ThemeConfig = ThemeService.getThemeConfig(ThemeMode.AUTO)
+  error: string = ''
+  isLoading: boolean = false
+  sortBy: 'name' | 'type' | 'status' | 'lastUsed' = 'name'
+  sortAscending: boolean = true
+  currentUser: any = null
+  isLoggedIn: boolean = false
 
   saveSettings() {
     new SettingsService().save(this.settings)
@@ -151,6 +157,55 @@ export class AppState {
     await HistoryService.addToHistory(historyItem)
   }
 
+  // 导航方法
+  openHome() {
+    this.currentPage = 'home'
+    this.error = ''
+  }
+
+  openSearch() {
+    this.currentPage = 'search'
+    this.error = ''
+  }
+
+  openDetail(source?: SourceUiModel) {
+    if (source) {
+      this.selectedSource = source
+    }
+    this.currentPage = 'detail'
+    this.error = ''
+  }
+
+  openPlayer() {
+    this.currentPage = 'player'
+    this.error = ''
+  }
+
+  openSettings() {
+    this.currentPage = 'settings'
+    this.error = ''
+  }
+
+  openFavorites() {
+    this.currentPage = 'favorites'
+    this.error = ''
+  }
+
+  openHistory() {
+    this.currentPage = 'history'
+    this.error = ''
+  }
+
+  openLogin() {
+    this.currentPage = 'login'
+    this.error = ''
+  }
+
+  openAnalytics() {
+    this.currentPage = 'analytics'
+    this.error = ''
+  }
+
   // 主题相关方法
   async loadTheme() {
     this.themeMode = await ThemeService.getThemeMode()
@@ -165,6 +220,150 @@ export class AppState {
     
     await ThemeService.setThemeMode(this.themeMode)
     this.themeConfig = ThemeService.getThemeConfig(this.themeMode)
+  }
+
+  // 错误处理方法
+  setError(message: string) {
+    this.error = message
+    this.isLoading = false
+    setTimeout(() => {
+      this.error = ''
+    }, 5000) // 5秒后自动清除错误
+  }
+
+  setLoading(loading: boolean) {
+    this.isLoading = loading
+  }
+
+  clearError() {
+    this.error = ''
+  }
+
+  // 安全的异步操作包装器
+  async safeAsync<T>(operation: () => Promise<T>, errorMessage: string = '操作失败'): Promise<T | null> {
+    try {
+      this.setLoading(true)
+      this.clearError()
+      const result = await operation()
+      return result
+    } catch (error) {
+      this.setError(`${errorMessage}: ${error}`)
+      return null
+    } finally {
+      this.setLoading(false)
+    }
+  }
+
+  // 数据源排序方法
+  sortSources(sortBy?: 'name' | 'type' | 'status' | 'lastUsed', ascending?: boolean) {
+    this.sortBy = sortBy || this.sortBy
+    this.sortAscending = ascending !== undefined ? ascending : this.sortAscending
+    
+    this.sources.sort((a, b) => {
+      let comparison = 0
+      
+      switch (this.sortBy) {
+        case 'name':
+          comparison = a.title.localeCompare(b.title)
+          break
+        case 'type':
+          comparison = a.type.localeCompare(b.type)
+          break
+        case 'status':
+          const statusOrder = { '可用': 0, '维护中': 1, '不可用': 2 }
+          comparison = (statusOrder[a.status as keyof typeof statusOrder] || 3) - 
+                     (statusOrder[b.status as keyof typeof statusOrder] || 3)
+          break
+        case 'lastUsed':
+          comparison = (b.lastUsed || 0) - (a.lastUsed || 0)
+          break
+        default:
+          comparison = a.title.localeCompare(b.title)
+      }
+      
+      return this.sortAscending ? comparison : -comparison
+    })
+    
+    // 同时更新过滤后的数据源
+    if (this.searchKeyword) {
+      this.filterSources(this.searchKeyword)
+    } else {
+      this.filteredSources = [...this.sources]
+    }
+  }
+
+  // 切换排序方式
+  toggleSort(column: 'name' | 'type' | 'status' | 'lastUsed') {
+    if (this.sortBy === column) {
+      this.sortAscending = !this.sortAscending
+    } else {
+      this.sortBy = column
+      this.sortAscending = true
+    }
+    this.sortSources()
+  }
+
+  // 用户相关方法
+  async checkLoginStatus() {
+    try {
+      this.isLoggedIn = await UserService.isLoggedIn()
+      if (this.isLoggedIn) {
+        this.currentUser = await UserService.getCurrentUser()
+        this.status = `欢迎回来，${this.currentUser?.username || '用户'}！`
+      }
+    } catch (error) {
+      console.error('Check login status failed:', error)
+    }
+  }
+
+  async login(username: string, password: string) {
+    try {
+      const result = await UserService.login(username, password)
+      if (result.success && result.user) {
+        this.isLoggedIn = true
+        this.currentUser = result.user
+        this.status = `欢迎回来，${result.user.username}！`
+        return true
+      } else {
+        this.error = result.error || '登录失败'
+        return false
+      }
+    } catch (error) {
+      this.error = '登录过程中发生错误'
+      return false
+    }
+  }
+
+  async logout() {
+    try {
+      await UserService.logout()
+      this.isLoggedIn = false
+      this.currentUser = null
+      this.status = '已退出登录'
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }
+
+  async syncFavorites() {
+    if (!this.isLoggedIn) return
+    
+    try {
+      const result = await UserService.syncFavoritesToCloud()
+      if (result.success) {
+        this.status = `同步完成：已同步 ${result.synced} 个收藏`
+      } else {
+        this.error = result.error || '同步失败'
+      }
+    } catch (error) {
+      this.error = '同步过程中发生错误'
+    }
+  }
+
+  // 获取排序图标
+  getSortIcon(column: 'name' | 'type' | 'status' | 'lastUsed'): string {
+    if (this.sortBy !== column) return '↕️'
+    return this.sortAscending ? '↑' : '↓'
   }
 
   openPlayer() {
@@ -182,6 +381,10 @@ export class AppState {
   openFavorites() {
     this.currentPage = 'favorites'
     this.loadFavorites()
+  }
+
+  openHistory() {
+    this.currentPage = 'history'
   }
 
   openHome() {

@@ -1,6 +1,7 @@
 import { appState } from '../common/AppState'
 import { MockBackendService } from '../service/MockBackendService'
 import { BackendApiService } from '../service/BackendApiService'
+import { UnifiedLoading, ErrorState, EmptyState } from '../components/LoadingStates'
 
 @Component
 export struct SearchPage {
@@ -35,31 +36,18 @@ export struct SearchPage {
 
       // 搜索结果
       if (this.searching) {
-        Column() {
-          LoadingProgress.create()
-            .width(30)
-            .height(30)
-          Text('搜索中...')
-            .fontSize(12)
-            .fontColor(Color.Gray)
-        }
-        .alignItems(HorizontalAlign.Center)
-        .width('100%')
-        .margin({ top: 20 })
+        UnifiedLoading({
+          message: '搜索中...',
+          showProgress: true,
+          size: 'small'
+        })
       } else if (this.error) {
-        Column() {
-          Text('搜索出错')
-            .fontSize(16)
-            .fontColor(Color.Red)
-          Text(this.error)
-            .fontSize(12)
-            .fontColor(Color.Gray)
-          Button('重试', { type: ButtonType.Normal })
-            .onClick(() => this.performSearch())
-        }
-        .alignItems(HorizontalAlign.Center)
-        .width('100%')
-        .margin({ top: 20 })
+        ErrorState({
+          title: '搜索出错',
+          message: this.error,
+          showRetry: true,
+          onRetry: () => this.performSearch()
+        })
       } else if (this.searchResults.length > 0) {
         Column() {
           Text(`找到 ${this.searchResults.length} 个结果`)
@@ -118,21 +106,22 @@ export struct SearchPage {
         }
         .width('100%')
       } else if (this.keyword.trim()) {
-        Text('暂无搜索结果')
-          .fontSize(14)
-          .fontColor(Color.Gray)
-          .margin({ top: 40 })
+        EmptyState({
+          icon: '🔍',
+          title: '暂无搜索结果',
+          description: `没有找到包含 "${this.keyword}" 的内容`,
+          showAction: true,
+          actionText: '清空搜索',
+          onAction: () => { this.keyword = '' }
+        })
       } else {
         // 默认提示
-        Column() {
-          if (appState.settings.useMockBackend) {
-            Text('🎭 Mock 搜索模式')
-              .fontSize(16)
-              .fontColor(Color.Orange)
-              .margin({ bottom: 8 })
-            Text('输入关键词搜索模拟数据')
-              .fontSize(12)
-              .fontColor(Color.Gray)
+        EmptyState({
+          icon: '🎭',
+          title: 'Mock 搜索模式',
+          description: '输入关键词搜索模拟数据',
+          showAction: false
+        })
             
             // Mock搜索建议
             Column({ space: 4 }) {
@@ -150,13 +139,7 @@ export struct SearchPage {
             }
             .margin({ top: 12 })
           } else {
-            Text('输入关键词开始搜索')
-              .fontSize(14)
-              .fontColor(Color.Gray)
-              .margin({ top: 40 })
-            Text('支持搜索影片名称、演员、导演等')
-              .fontSize(12)
-              .fontColor(Color.Gray)
+            
           }
         }
         .alignItems(HorizontalAlign.Center)

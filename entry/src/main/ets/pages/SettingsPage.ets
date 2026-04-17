@@ -1,5 +1,6 @@
 import { AppSettings } from '../model/Models'
 import { ConfigService } from '../service/ConfigService'
+import { UserService } from '../service/UserService'
 import { appState } from '../common/AppState'
 import { ThemeService, ThemeMode } from '../service/ThemeService'
 
@@ -104,6 +105,78 @@ export struct SettingsPage {
           Text('点击主题图标切换：浅色☀️ → 深色🌙 → 自动🔄')
             .fontSize(12)
             .fontColor(Color.Gray)
+        }
+        .padding(12)
+        .width('100%')
+      }
+      
+      // 用户账户设置
+      Card() {
+        Column({ space: 12 }) {
+          Text(appState.isLoggedIn ? `👤 用户: ${appState.currentUser?.username || '未知'}` : '👤 用户账户')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+          
+          if (appState.isLoggedIn) {
+            // 已登录状态
+            Text(`邮箱: ${appState.currentUser?.email || '未设置'}`)
+              .fontSize(14)
+              .fontColor(Color.Gray)
+            
+            Text(`注册时间: ${new Date(appState.currentUser?.createdAt || 0).toLocaleDateString()}`)
+              .fontSize(12)
+              .fontColor(Color.Gray)
+            
+            Text(`最后登录: ${new Date(appState.currentUser?.lastLoginAt || 0).toLocaleDateString()}`)
+              .fontSize(12)
+              .fontColor(Color.Gray)
+            
+            Row({ space: 8 }) {
+              Button('🔄 同步收藏', { type: ButtonType.Normal })
+                .onClick(async () => {
+                  await appState.syncFavorites()
+                })
+              
+              Button('🚪 退出登录', { type: ButtonType.Normal })
+                .backgroundColor(Color.Red)
+                .onClick(async () => {
+                  await appState.logout()
+                })
+            }
+          } else {
+            // 未登录状态
+            Text('登录以使用云同步功能')
+              .fontSize(14)
+              .fontColor(Color.Gray)
+            
+            Button('🔑 登录账户', { type: ButtonType.Normal })
+              .onClick(() => appState.openLogin())
+            
+            Text('演示账号: demo / 123456')
+              .fontSize(12)
+              .fontColor(Color.Gray)
+              .margin({ top: 8 })
+          }
+        }
+        .padding(12)
+        .width('100%')
+      }
+      
+      // 数据分析设置
+      Card() {
+        Column({ space: 12 }) {
+          Text('📊 数据分析')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+          
+          Button('📈 查看分析', { type: ButtonType.Normal })
+            .onClick(() => appState.openAnalytics())
+          
+          Button('📋 导出报告', { type: ButtonType.Normal })
+            .onClick(async () => {
+              // 触发分析页面导出功能
+              appState.status = '请在数据分析页面导出详细报告'
+            })
         }
         .padding(12)
         .width('100%')
