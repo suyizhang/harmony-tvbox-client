@@ -8,6 +8,7 @@
     "pages/HistoryPage",
     "pages/FavoritesPage",
     "pages/AnalyticsPage",
-    "pages/LoginPage"
+    "pages/LoginPage",
+    "pages/PluginMarketPage"
   ]
 }

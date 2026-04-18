@@ -181,6 +181,40 @@ export struct SettingsPage {
         .padding(12)
         .width('100%')
       }
+      
+      // 插件管理设置
+      Card() {
+        Column({ space: 12 }) {
+          Text('🔌 插件管理')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+          
+          Button('🏪 插件市场', { type: ButtonType.Normal })
+            .onClick(() => appState.navigateTo('/plugin-market'))
+          
+          Button('⚙️ 插件设置', { type: ButtonType.Normal })
+            .onClick(() => appState.status = '插件详细设置功能开发中...')
+        }
+        .padding(12)
+        .width('100%')
+      }
+      
+      // 用户反馈设置
+      Card() {
+        Column({ space: 12 }) {
+          Text('💬 意见反馈')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+          
+          Button('📝 提交反馈', { type: ButtonType.Normal })
+            .onClick(() => appState.navigateTo('/feedback'))
+          
+          Button('❓ 常见问题', { type: ButtonType.Normal })
+            .onClick(() => appState.status = '常见问题页面开发中...')
+        }
+        .padding(12)
+        .width('100%')
+      }
     }
     .padding(16)
     .width('100%')
